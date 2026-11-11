@@ -1,10 +1,15 @@
 using MyBookingApi.Application;
 using MyBookingApi.Infrastructure;
+using MyBookingApi.WebApi.Middlewares;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+// Register the custom exception handler and problem details infrastructure services in DI container
+builder.Services.AddExceptionHandler<CustomExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -28,6 +33,10 @@ if (app.Environment.IsDevelopment())
         options.Theme = ScalarTheme.Default;
     });
 }
+
+// Enable the exception handler middleware early in the HTTP request pipeline
+// (Must be placed before routing, authentication, and controllers)
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 

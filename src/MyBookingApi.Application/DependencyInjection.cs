@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using MyBookingApi.Application.Common.Behaviours;
 using System.Reflection;
 using FluentValidation;
 
@@ -17,11 +18,13 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         // Register MediatR handlers from the current assembly
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-
+        return services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly());
+            // Registers ValidationBehavior as a pipeline middleware for all requests/responses
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+        })
         // Register FluentValidation validators from the current assembly
-        services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
-
-        return services;
+        .AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
     }
 }
