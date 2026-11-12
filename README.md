@@ -30,7 +30,7 @@ We addressed these requirements through the following foundational principles:
 
 ## 2. Key Architectural Decisions & Patterns
 
-* ### Rich Domain Model & Domain-Driven Design (DDD)
+### Rich Domain Model & Domain-Driven Design (DDD)
 * **Decision:** Embraced Domain-Driven Design (DDD) patterns by moving away from anemic domain models. Business logic, state transitions, and entity invariants are encapsulated directly within domain entities (e.g., `Booking`, `Resource`) with private setters and protective methods (e.g., `Cancel()`).
 * **Why:** Prevents invalid entity states, keeps business rules centralized where they belong, and ensures that the domain layer remains pure and independent of infrastructure concerns.
 
