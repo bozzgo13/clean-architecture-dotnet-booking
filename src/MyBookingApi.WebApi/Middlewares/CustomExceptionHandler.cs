@@ -43,6 +43,7 @@ public class CustomExceptionHandler : IExceptionHandler
         var problemDetails = exception switch
         {
             ValidationException validationException => CreateValidationProblemDetails(validationException),
+            UnauthorizedAccessException => CreateUnauthorizedProblemDetails(),
             _ => CreateInternalServerProblemDetails(exception)
         };
 
@@ -73,6 +74,21 @@ public class CustomExceptionHandler : IExceptionHandler
             Title = "Validation Failed",
             Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
             Detail = "One or more validation errors occurred during request processing."
+        };
+    }
+
+    /// <summary>
+    /// Creates a standardized ProblemDetails payload for authentication failures
+    /// (e.g. a missing or invalid user identifier claim).
+    /// </summary>
+    private static ProblemDetails CreateUnauthorizedProblemDetails()
+    {
+        return new ProblemDetails
+        {
+            Status = StatusCodes.Status401Unauthorized,
+            Title = "Unauthorized",
+            Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+            Detail = "The request could not be authenticated. Authentication credentials are missing or invalid."
         };
     }
 
