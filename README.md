@@ -31,8 +31,12 @@ We addressed these requirements through the following foundational principles:
 ## 2. Key Architectural Decisions & Patterns
 
 ### Rich Domain Model & Domain-Driven Design (DDD)
-* **Decision:** Embraced Domain-Driven Design (DDD) patterns by moving away from anemic domain models. Business logic, state transitions, and entity invariants are encapsulated directly within domain entities (e.g., `Booking`, `Resource`) with private setters and protective methods (e.g., `Cancel()`).
+* **Decision:** Embraced Domain-Driven Design (DDD) patterns by moving away from anemic domain models. Business logic, state transitions, and entity invariants are encapsulated directly within domain entities (e.g., `Booking`, `Resource`, `User`) with private setters and protective methods (e.g., `Cancel()`, `NormalizeEmail()`).
 * **Why:** Prevents invalid entity states, keeps business rules centralized where they belong, and ensures that the domain layer remains pure and independent of infrastructure concerns.
+
+### Vertical Slice Organization
+* **Decision:** Organized application features around self-contained **Vertical Slices** (e.g., `CreateBooking`, `GetBookings`, `Register`) rather than grouping files strictly by technical role.
+* **Why:** Keeps commands/queries, handlers, DTOs, and validators cohesive and close together. Adding or modifying a feature requires touching a single feature folder, reducing coupling across the codebase.
 
 ### Code-First Approach
 * **Decision:** We adopted an Entity Framework Core **Code-First** approach to model database entities directly in C#.
@@ -40,11 +44,24 @@ We addressed these requirements through the following foundational principles:
 
 ### CQRS via MediatR
 * **Decision:** Command Query Responsibility Segregation (CQRS) implemented through **MediatR**.
-* **Why:** Decouples write operations (`CreateBookingCommand`) from read queries, making handlers focused, small, and highly testable.
+* **Why:** Decouples write operations (`CreateBookingCommand` etc) from read queries (`GetBookingsQuery`), making handlers focused, small, and highly testable.
+
+### Fail-Fast Validation Strategy (FluentValidation)
+* **Decision:** Implemented a **Fail-Fast** validation approach using **FluentValidation** rules on incoming commands and queries before any business logic or database operations are executed.
+* **Why:** Validates data contracts, formatting (e.g., email syntax, password complexity), and required fields immediately at the application boundary. Invalid requests fail early with clear `400 Bad Request` errors, saving database round-trips and protecting the domain from corrupt inputs.
+
+### Centralized Exception Handling (`ProblemDetails`)
+* **Decision:** Implemented a global exception handler (`IExceptionHandler`) in the WebApi layer that intercepts domain and application exceptions (such as `ValidationException` or `UnauthorizedAccessException`) and maps them to standardized RFC 7807 `ProblemDetails` HTTP responses.
+* **Why:** Eliminates repetitive `try-catch` boilerplate inside controllers and guarantees consistent, predictable, and secure error payloads across all endpoints without leaking internal stack traces.
 
 ### Direct EF Core Context Usage (`IApplicationDbContext`) in Handlers
 * **Decision:** Handlers interact directly with an abstraction of the EF Core context (`IApplicationDbContext`) rather than wrapping EF Core behind explicit repository classes.
 * **Why:** EF Core's `DbSet<T>` and `DbContext` already implement the Repository and Unit of Work patterns natively, avoiding redundant repository abstractions while preserving testability.
+
+### Security & Authentication Architecture
+* **ASP.NET Core Identity & Cryptographic Password Hashing (PBKDF2):** Passwords are never stored in plain text. Password hashing is abstracted behind `IPasswordHasher` in the Application layer and implemented in Infrastructure via **ASP.NET Core Identity's** `PasswordHasher` (`Microsoft.Extensions.Identity.Core`). Using Identity's battle-tested PBKDF2 implementation (with per-hash random salts, high iteration counts, and algorithm version markers) provides enterprise-grade protection against rainbow table and brute-force attacks while keeping the Domain layer completely decoupled from full ASP.NET Core Identity schema overhead.
+* **Stateless JWT Authentication & Claims Extraction:** Protected endpoints enforce `[Authorize]` using JWT Bearer tokens. Custom `ClaimsPrincipalExtensions` cleanly extract user identity and role claims (`GetUserId()`, `IsAdmin()`), keeping controllers thin and readable.
+* **Database-Level Uniqueness & Concurrency Protection:** User emails are normalized (trimmed and lowercased) in the Domain layer and enforced via a unique database index (`IsUnique()`), with `DbUpdateException` handling to gracefully translate concurrent duplicate registration race conditions into `400 Bad Request` responses.
 
 ---
 
