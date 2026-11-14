@@ -115,6 +115,69 @@ public class GetBookingsQueryIntegrationTests : IDisposable
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    /// <summary>
+    /// BFLA (API5): an authenticated regular user must receive 403 Forbidden when calling the
+    /// admin-only endpoint, proving privileged functionality is gated by role, not by obscurity.
+    /// </summary>
+    [Fact]
+    public async Task GetAllBookings_AsRegularUser_ReturnsForbidden()
+    {
+        // Arrange
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/bookings/all");
+        request.Headers.Add(TestAuthHandler.UserIdHeader, Guid.NewGuid().ToString());
+        request.Headers.Add(TestAuthHandler.RoleHeader, "User");
+
+        // Act
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>
+    /// BFLA (API5): an administrator is authorized for the admin-only endpoint and receives every
+    /// booking in the system.
+    /// </summary>
+    [Fact]
+    public async Task GetAllBookings_AsAdministrator_ReturnsAllBookings()
+    {
+        // Arrange
+        var resourceId = Guid.NewGuid();
+
+        var firstBooking = new Booking(Guid.NewGuid(), resourceId, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(1).AddHours(1));
+        var secondBooking = new Booking(Guid.NewGuid(), resourceId, DateTime.UtcNow.AddDays(2), DateTime.UtcNow.AddDays(2).AddHours(1));
+
+        _factory.Seed(context => context.Bookings.AddRange(firstBooking, secondBooking));
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/bookings/all");
+        request.Headers.Add(TestAuthHandler.UserIdHeader, Guid.NewGuid().ToString());
+        request.Headers.Add(TestAuthHandler.RoleHeader, "Admin");
+
+        // Act
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var bookings = await response.Content.ReadFromJsonAsync<List<BookingDto>>();
+        bookings.Should().HaveCount(2);
+        bookings!.Select(b => b.Id).Should().BeEquivalentTo(new[] { firstBooking.Id, secondBooking.Id });
+    }
+
+    /// <summary>
+    /// An unauthenticated request to the admin-only endpoint must be rejected with 401 Unauthorized
+    /// before any role evaluation takes place.
+    /// </summary>
+    [Fact]
+    public async Task GetAllBookings_WhenUnauthenticated_ReturnsUnauthorized()
+    {
+        // Act
+        var response = await _client.GetAsync("/api/bookings/all");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

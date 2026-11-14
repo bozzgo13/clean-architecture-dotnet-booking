@@ -21,6 +21,11 @@ public class MyBookingApiWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
 
+        // The production application deliberately refuses to start without a strong JWT signing key
+        // (see the fail-fast validation in Program.cs). The integration host replaces the JWT bearer
+        // scheme with TestAuthHandler, so this value is only here to satisfy that startup check.
+        builder.UseSetting("Jwt:Key", "integration-tests-only-signing-key-0123456789-abcdef");
+
         builder.ConfigureTestServices(services =>
         {
             // Remove every registration AddInfrastructure made for the AppDbContext. Critically, this
