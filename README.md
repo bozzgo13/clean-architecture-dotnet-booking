@@ -28,7 +28,17 @@ We addressed these requirements through the following foundational principles:
 
 ---
 
-## 2. Key Architectural Decisions & Patterns
+## 2. Security & Architectural Standards Compliance
+
+The system strictly adheres to the **OWASP API Security Top 10 (2023)** standards and **Microsoft ASP.NET Core 10 Technological Best Practices**, ensuring enterprise-grade protection against critical vulnerabilities (such as BOLA, BFLA, mass assignment, and security misconfigurations) while leveraging native, high-performance .NET patterns.
+
+### Core Security & Authentication Architecture
+* **Cryptographic Password Hashing (PBKDF2):** Passwords are never stored in plain text. Hashing is abstracted behind `IPasswordHasher` in the Application layer and implemented via **ASP.NET Core Identity's** `PasswordHasher`. Utilizing per-hash random salts, high iteration counts, and version markers provides robust protection against rainbow table and brute-force attacks (OWASP API4:2023).
+* **Stateless JWT Authentication & Claims Extraction:** Protected endpoints enforce `[Authorize]` using JWT Bearer tokens with fail-fast options validation (enforcing minimum 256-bit keys per OWASP API8:2023). Custom `ClaimsPrincipalExtensions` cleanly extract user identity and role claims (`GetUserId()`, `IsAdmin()`), keeping controllers thin.
+* **Object-Level Authorization & BOLA/BFLA Prevention:** Endpoints strictly enforce authorization boundaries (e.g., admin-only routes restricted via `[Authorize(Roles = "Admin")]`), and resource ownership is derived exclusively from the authenticated principal rather than client input.
+* **Mass Assignment Protection:** Incoming payloads use explicit DTOs (`CreateBookingRequest`) that intentionally omit sensitive or privileged fields (such as `UserId` or `Role`), preventing overposting vulnerabilities (OWASP API3:2023).
+* **Secure Error Handling & Information Disclosure Prevention:** A global exception handler (`IExceptionHandler`) maps domain/application exceptions to standardized RFC 7807 `ProblemDetails` responses with unique `traceId` correlation, ensuring unexpected errors never leak internal stack traces or database details (OWASP API8:2023).
+* **Database-Level Uniqueness & Concurrency Protection:** User emails are normalized in the Domain layer and enforced via a unique database index (`IsUnique()`), with `DbUpdateException` handling to gracefully translate concurrent duplicate registration race conditions into `400 Bad Request` responses.
 
 ### Rich Domain Model & Domain-Driven Design (DDD)
 * **Decision:** Embraced Domain-Driven Design (DDD) patterns by moving away from anemic domain models. Business logic, state transitions, and entity invariants are encapsulated directly within domain entities (e.g., `Booking`, `Resource`, `User`) with private setters and protective methods (e.g., `Cancel()`, `NormalizeEmail()`).
@@ -57,11 +67,6 @@ We addressed these requirements through the following foundational principles:
 ### Direct EF Core Context Usage (`IApplicationDbContext`) in Handlers
 * **Decision:** Handlers interact directly with an abstraction of the EF Core context (`IApplicationDbContext`) rather than wrapping EF Core behind explicit repository classes.
 * **Why:** EF Core's `DbSet<T>` and `DbContext` already implement the Repository and Unit of Work patterns natively, avoiding redundant repository abstractions while preserving testability.
-
-### Security & Authentication Architecture
-* **ASP.NET Core Identity & Cryptographic Password Hashing (PBKDF2):** Passwords are never stored in plain text. Password hashing is abstracted behind `IPasswordHasher` in the Application layer and implemented in Infrastructure via **ASP.NET Core Identity's** `PasswordHasher` (`Microsoft.Extensions.Identity.Core`). Using Identity's battle-tested PBKDF2 implementation (with per-hash random salts, high iteration counts, and algorithm version markers) provides enterprise-grade protection against rainbow table and brute-force attacks while keeping the Domain layer completely decoupled from full ASP.NET Core Identity schema overhead.
-* **Stateless JWT Authentication & Claims Extraction:** Protected endpoints enforce `[Authorize]` using JWT Bearer tokens. Custom `ClaimsPrincipalExtensions` cleanly extract user identity and role claims (`GetUserId()`, `IsAdmin()`), keeping controllers thin and readable.
-* **Database-Level Uniqueness & Concurrency Protection:** User emails are normalized (trimmed and lowercased) in the Domain layer and enforced via a unique database index (`IsUnique()`), with `DbUpdateException` handling to gracefully translate concurrent duplicate registration race conditions into `400 Bad Request` responses.
 
 ---
 
