@@ -148,6 +148,19 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+
+    // Strict policy for the login endpoint. Throttling credential submission per client slows down
+    // password brute-force and account-enumeration attempts (OWASP API2:2023 - Broken Authentication).
+    options.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 });
 
 // OWASP API4: bound the total time a request may run so a slow or hung request cannot occupy a worker
