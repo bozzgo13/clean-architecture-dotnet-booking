@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using MyBookingApi.Application.Auth.Commands.Register;
 using MyBookingApi.Application.Common.Interfaces;
 using MyBookingApi.Domain.Entities;
@@ -22,7 +23,7 @@ public class RegisterCommandHandlerTests
 
         _context = new TestApplicationDbContext(options);
         _passwordHasher = new FakePasswordHasher();
-        _handler = new RegisterCommandHandler(_context, _passwordHasher);
+        _handler = new RegisterCommandHandler(_context, _passwordHasher, NullLogger<RegisterCommandHandler>.Instance);
     }
 
     /// <summary>
@@ -87,7 +88,7 @@ public class RegisterCommandHandlerTests
         var innerException = new Exception(
             "Cannot insert duplicate key row in object 'dbo.Users' with unique index 'IX_Users_Email'.");
         using var context = new ThrowingSaveChangesDbContext(options, new DbUpdateException("Save failed.", innerException));
-        var handler = new RegisterCommandHandler(context, _passwordHasher);
+        var handler = new RegisterCommandHandler(context, _passwordHasher, NullLogger<RegisterCommandHandler>.Instance);
 
         var command = new RegisterCommand("manarkz@skyemails.tech", "UnoMana007!", "Mana", "RKZ");
 
@@ -113,7 +114,7 @@ public class RegisterCommandHandlerTests
 
         var innerException = new Exception("A network-related error occurred while establishing a connection to the server.");
         using var context = new ThrowingSaveChangesDbContext(options, new DbUpdateException("Save failed.", innerException));
-        var handler = new RegisterCommandHandler(context, _passwordHasher);
+        var handler = new RegisterCommandHandler(context, _passwordHasher, NullLogger<RegisterCommandHandler>.Instance);
 
         var command = new RegisterCommand("realemmastone@itis.me", "Not4Long!", "Emma", "Stone");
 

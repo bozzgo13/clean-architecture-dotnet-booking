@@ -60,6 +60,51 @@ public class RegisterCommandValidatorTests
     }
 
     [Fact]
+    public void Should_Have_Error_When_Password_Exceeds_Maximum_Length()
+    {
+        // Arrange: a valid password padded beyond the maximum length must be rejected so an
+        // oversized payload cannot be used to exhaust resources during hashing.
+        var password = "A"+ new string('a', RegisterCommandValidator.MaximumPasswordLength-2)+"1!";
+        var command = ValidCommand() with { Password = password };
+
+        // Act
+        var result = _validator.TestValidate(command);
+
+        // Assert
+        result.ShouldHaveValidationErrorFor(x => x.Password);
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_Email_Exceeds_Maximum_Length()
+    {
+        var command = ValidCommand() with { Email = new string('a', 250) + "@example.com" };
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(x => x.Email);
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_FirstName_Exceeds_Maximum_Length()
+    {
+        var command = ValidCommand() with { FirstName = new string('a', 101) };
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(x => x.FirstName);
+    }
+
+    [Fact]
+    public void Should_Have_Error_When_LastName_Exceeds_Maximum_Length()
+    {
+        var command = ValidCommand() with { LastName = new string('a', 101) };
+
+        var result = _validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(x => x.LastName);
+    }
+
+    [Fact]
     public void Should_Have_Error_When_FirstName_Is_Empty()
     {
         var command = ValidCommand() with { FirstName = "" };
