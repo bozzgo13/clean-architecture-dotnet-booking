@@ -7,13 +7,13 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MyBookingApi.Application;
 using MyBookingApi.Infrastructure;
-using MyBookingApi.WebApi.Configuration;
+using MyBookingApi.Infrastructure.Security;
 using MyBookingApi.WebApi.Middlewares;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// OWASP API4:2023 – Unrestricted Resource Consumption: cap the request body size at the server level so oversized payloads cannot exhaust memory.
+// OWASP API4:2023 â€“ Unrestricted Resource Consumption: cap the request body size at the server level so oversized payloads cannot exhaust memory.
 // JSON API requests are small; 1 MB is generous for legitimate traffic and rejects abuse early.
 builder.WebHost.ConfigureKestrel(options =>
 {
@@ -28,7 +28,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Fail-fast configuration validation (OWAST API8:2023 – Security Misconfiguration). Bind the "Jwt" section to a strongly-typed options
+// Fail-fast configuration validation (OWAST API8:2023 â€“ Security Misconfiguration). Bind the "Jwt" section to a strongly-typed options
 // object and validate it when the host starts: a missing issuer/audience or a signing key shorter
 // than 256 bits (the HS256 minimum) aborts startup instead of allowing forgeable tokens.
 builder.Services.AddOptions<JwtOptions>()

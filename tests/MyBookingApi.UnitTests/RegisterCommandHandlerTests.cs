@@ -166,5 +166,8 @@ public class RegisterCommandHandlerTests
     private class FakePasswordHasher : IPasswordHasher
     {
         public string HashPassword(string password) => $"hashed::{password}";
+
+        public bool VerifyPassword(string? hashedPassword, string providedPassword)
+            => hashedPassword is not null && hashedPassword == HashPassword(providedPassword);
     }
 }

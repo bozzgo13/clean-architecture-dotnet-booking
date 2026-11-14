@@ -23,6 +23,10 @@ public static class DependencyInjection
         // Register the password hashing service used by authentication commands
         services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
 
+        // Register the JWT access-token generator used by authentication commands. It only depends on
+        // immutable validated options, so a single instance can safely be shared.
+        services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+
         return services;
     }
 }
