@@ -1,6 +1,7 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MyBookingApi.Application.Auth.Commands.Register;
 
 namespace MyBookingApi.WebApi.Controllers;
@@ -24,8 +25,10 @@ public class AuthController : ControllerBase
     /// <returns>The unique identifier of the newly created user.</returns>
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("registration")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<Guid>> Register([FromBody] RegisterCommand command, CancellationToken cancellationToken)
     {
         // The controller stays thin: it only forwards the command through MediatR to the handler.
