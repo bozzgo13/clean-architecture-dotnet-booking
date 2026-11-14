@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyBookingApi.Application.Common.Interfaces;
 using MyBookingApi.Infrastructure.Persistence;
+using MyBookingApi.Infrastructure.Security;
 
 namespace MyBookingApi.Infrastructure;
 
@@ -18,6 +19,9 @@ public static class DependencyInjection
 
         // Bind IApplicationDbContext to AppDbContext implementation
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+
+        // Register the password hashing service used by authentication commands
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
 
         return services;
     }

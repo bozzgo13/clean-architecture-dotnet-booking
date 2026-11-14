@@ -14,8 +14,21 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(256);
 
+        // Enforce email uniqueness at the database level. Combined with the normalized
+        // (lowercased) storage in the domain entity, this makes duplicates case-insensitive.
+        builder.HasIndex(u => u.Email)
+            .IsUnique();
+
         builder.Property(u => u.PasswordHash)
             .IsRequired();
+
+        builder.Property(u => u.FirstName)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Property(u => u.LastName)
+            .IsRequired()
+            .HasMaxLength(100);
 
         builder.Property(u => u.Role)
             .IsRequired()
