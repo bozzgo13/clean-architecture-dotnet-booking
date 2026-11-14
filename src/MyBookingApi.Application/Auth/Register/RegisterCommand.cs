@@ -2,6 +2,7 @@
 using FluentValidation.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MyBookingApi.Application.Common.Interfaces;
 using MyBookingApi.Domain.Entities;
 
@@ -30,16 +31,22 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Guid>
 {
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ILogger<RegisterCommandHandler> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RegisterCommandHandler"/> class.
     /// </summary>
     /// <param name="context">The database context abstraction accessed via Dependency Injection.</param>
     /// <param name="passwordHasher">The password hashing service used to secure the credential.</param>
-    public RegisterCommandHandler(IApplicationDbContext context, IPasswordHasher passwordHasher)
+    /// <param name="logger">The structured logger used for security-relevant audit events.</param>
+    public RegisterCommandHandler(
+        IApplicationDbContext context,
+        IPasswordHasher passwordHasher,
+        ILogger<RegisterCommandHandler> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
+        _logger = logger;
     }
 
     /// <summary>
@@ -62,6 +69,12 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Guid>
 
         if (emailAlreadyExists)
         {
+            // Audit-relevant security event: a registration was rejected because the email is already
+            // registered. Only the (normalized) email is recorded; the password is never logged.
+            _logger.LogWarning(
+                "User registration rejected because the email is already registered. Email={Email}",
+                normalizedEmail);
+
             // Surfaced as a validation failure so the global handler maps it to 400 Bad Request.
             throw new ValidationException(new[]
             {
@@ -92,6 +105,10 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Guid>
             // Translating that specific failure into the same ValidationException keeps the API contract
             // stable (400 Bad Request) instead of leaking a 500 Internal Server Error.
             // Genuine, unrelated database failures are deliberately NOT caught here and still surface as 500s.
+            _logger.LogWarning(
+                "User registration rejected by the unique email constraint during a concurrent request. Email={Email}",
+                normalizedEmail);
+
             throw new ValidationException(new[]
             {
                 new ValidationFailure(
@@ -99,6 +116,10 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, Guid>
                     "An account with this email address already exists.")
             });
         }
+
+        // Audit-relevant security event: a new account was created. Only the opaque identifier is
+        // logged, never the password or the plaintext credential.
+        _logger.LogInformation("User registration succeeded. UserId={UserId}", user.Id);
 
         return user.Id;
     }
