@@ -104,9 +104,9 @@ The system strictly adheres to the **OWASP API Security Top 10 (2023)** standard
 ### G. Bootstrapping the First Administrator Securely (The Chicken-and-Egg Problem)
 * **Problem:** In a freshly deployed environment with an empty database, no administrator account exists. Relying on public registration endpoints creates severe security vulnerabilities (privilege escalation), while hardcoding credentials in configuration files or database migrations introduces high security risks and non-deterministic password hashing issues.
 * **Solution:** Implemented a secure, opt-in **Application-layer bootstrap command** paired with a **startup initializer (`IHostedService`)**:
-* **Isolated Command:** Created a dedicated `BootstrapAdminUserCommand` separate from public user registration to strictly prevent unauthorized role self-assignment.
-* **Cryptographically Secure Credentials:** When enabled (`AdminBootstrap__Enabled=true`), a high-entropy one-time password is generated dynamically in memory via a CSPRNG and printed to standard output on first run, ensuring secrets never reside in source control or configuration files.
-* **Idempotency & Concurrency Safety:** The handler safely checks for existing administrators and gracefully handles multi-replica database races using unique email constraints, making it completely safe to execute on every startup.
+  * **Isolated Command:** Created a dedicated `BootstrapAdminUserCommand` separate from public user registration to strictly prevent unauthorized role self-assignment.
+  * **Cryptographically Secure Credentials:** When enabled (`AdminBootstrap__Enabled=true`), a high-entropy one-time password is generated dynamically in memory via a CSPRNG and printed to standard output on first run, ensuring secrets never reside in source control or configuration files.
+  * **Idempotency & Concurrency Safety:** The handler safely checks for existing administrators and gracefully handles multi-replica database races using unique email constraints, making it completely safe to execute on every startup.
 
 ---
 
