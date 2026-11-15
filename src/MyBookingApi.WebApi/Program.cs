@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using MyBookingApi.Application;
 using MyBookingApi.Infrastructure;
 using MyBookingApi.Infrastructure.Security;
+using MyBookingApi.WebApi.HostedServices;
 using MyBookingApi.WebApi.Middlewares;
 using Scalar.AspNetCore;
 
@@ -27,6 +28,17 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Background maintenance (OWASP API4:2023 - Unrestricted Resource Consumption): a hosted service
+// periodically prunes refresh tokens that expired or were revoked long ago, so the token store cannot
+// grow without bound. Its schedule and retention are configuration-driven and validated at startup,
+// and both fall back to safe defaults when the section is absent.
+builder.Services.AddOptions<RefreshTokenCleanupOptions>()
+    .Bind(builder.Configuration.GetSection(RefreshTokenCleanupOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 // Fail-fast configuration validation (OWAST API8:2023 – Security Misconfiguration). Bind the "Jwt" section to a strongly-typed options
 // object and validate it when the host starts: a missing issuer/audience or a signing key shorter
@@ -157,6 +169,34 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    // Strict policy for the token-refresh endpoint. Rotation is legitimate but infrequent, so a modest
+    // per-client allowance protects the token store against credential-stuffing and replay attempts
+    // while leaving ample headroom for normal session maintenance.
+    options.AddPolicy("refresh", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    // Strict policy for the logout endpoint. Sign-out is legitimate but infrequent, so the same modest
+    // per-client allowance as refresh protects the token store against abuse while leaving ample
+    // headroom for normal session teardown.
+    options.AddPolicy("logout", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
