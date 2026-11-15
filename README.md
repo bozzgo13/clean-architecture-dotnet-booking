@@ -108,6 +108,12 @@ The system strictly adheres to the **OWASP API Security Top 10 (2023)** standard
   * **Cryptographically Secure Credentials:** When enabled (`AdminBootstrap__Enabled=true`), a high-entropy one-time password is generated dynamically in memory via a CSPRNG and printed to standard output on first run, ensuring secrets never reside in source control or configuration files.
   * **Idempotency & Concurrency Safety:** The handler safely checks for existing administrators and gracefully handles multi-replica database races using unique email constraints, making it completely safe to execute on every startup.
 
+### H. Integration Test Hermeticity and Local User Secrets Contamination
+* **Problem:** 
+  The integration test host runs in the `Development` environment by default, which causes ASP.NET Core to automatically load machine-local User Secrets. Developer-specific local overrides—such as a custom `Jwt:Audience` or an enabled `AdminBootstrap` configuration—silently leaked into the test execution context. This caused test suite results to become machine-dependent, leading to intermittent failures on developer workstations while passing elsewhere.
+* **Solution:** 
+  Achieved complete test host hermeticity by explicitly pinning critical configuration keys (`Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key`, and `AdminBootstrap:Enabled = false`) directly within `MyBookingApiWebApplicationFactory` using an in-memory configuration source appended after User Secrets. This guarantees that test parameters remain consistent and isolated regardless of local machine configurations, while allowing specific tests (such as the admin bootstrap integration test) to safely override the configuration layer exclusively for their isolated host instance.
+
 ---
 
 ## 4. Local Database Setup & Migration Instructions
