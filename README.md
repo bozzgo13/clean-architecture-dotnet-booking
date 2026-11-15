@@ -133,7 +133,48 @@ Apply the migration to create the SQL Server database and tables:
 dotnet ef database update --project src/MyBookingApi.Infrastructure --startup-project src/MyBookingApi.WebApi
 ```
 
-### Step 4: Run the Application
+### Step 4: Configure Local Application Secrets (JWT Configuration)
+
+Because the API enforces strict startup validation and requires a secure cryptographic key (at least 256 bits / 32 bytes) for JWT token generation, you must configure your local secrets before running the application. Choose **one** of the following methods:
+
+#### Option A: Using .NET User Secrets (Recommended for local development)
+
+Navigate to the Web API project directory and set the required configuration values securely using User Secrets (keeping secrets out of source control):
+
+```bash
+cd src/MyBookingApi.WebApi
+dotnet user-secrets init
+dotnet user-secrets set "Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
+dotnet user-secrets set "Jwt:Issuer" "MyBookingApi"
+dotnet user-secrets set "Jwt:Audience" "MyBookingApiUsers"
+
+```
+
+#### Option B: Using Environment Variables
+
+Alternatively, you can provide the configuration via environment variables in your terminal session (using double underscores `__` for nested configuration sections):
+
+**PowerShell:**
+
+```powershell
+$env:Jwt__Key = "Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
+$env:Jwt__Issuer = "MyBookingApi"
+$env:Jwt__Audience = "MyBookingApiUsers"
+
+```
+
+**Bash / Linux / macOS:**
+
+```bash
+export Jwt__Key="Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
+export Jwt__Issuer="MyBookingApi"
+export Jwt__Audience="MyBookingApiUsers"
+
+```
+
+---
+
+### Step 5: Run the Application
 Run the Web API project:
 ```bash
 dotnet run --project src/MyBookingApi.WebApi
