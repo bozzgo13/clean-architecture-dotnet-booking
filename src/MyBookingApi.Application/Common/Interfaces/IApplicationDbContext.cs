@@ -28,6 +28,11 @@ public interface IApplicationDbContext
     DbSet<Booking> Bookings { get; }
 
     /// <summary>
+    /// Gets the DbSet for issued refresh tokens.
+    /// </summary>
+    DbSet<RefreshToken> RefreshTokens { get; }
+
+    /// <summary>
     /// Asynchronously saves all changes made in this context to the underlying database.
     /// </summary>
     /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>

@@ -138,6 +138,7 @@ public class RegisterCommandHandlerTests
         public DbSet<User> Users => Set<User>();
         public DbSet<Resource> Resources => Set<Resource>();
         public DbSet<Booking> Bookings => Set<Booking>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     }
 
     /// <summary>

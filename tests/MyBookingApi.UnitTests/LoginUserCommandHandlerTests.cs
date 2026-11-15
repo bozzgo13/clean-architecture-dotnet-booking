@@ -16,6 +16,7 @@ public class LoginUserCommandHandlerTests
     private readonly TestApplicationDbContext _context;
     private readonly FakePasswordHasher _passwordHasher;
     private readonly FakeJwtTokenGenerator _tokenGenerator;
+    private readonly FakeRefreshTokenGenerator _refreshTokenGenerator;
     private readonly LoginUserCommandHandler _handler;
 
     public LoginUserCommandHandlerTests()
@@ -30,10 +31,12 @@ public class LoginUserCommandHandlerTests
         _context = new TestApplicationDbContext(options);
         _passwordHasher = new FakePasswordHasher();
         _tokenGenerator = new FakeJwtTokenGenerator();
+        _refreshTokenGenerator = new FakeRefreshTokenGenerator();
         _handler = new LoginUserCommandHandler(
             _context,
             _passwordHasher,
             _tokenGenerator,
+            _refreshTokenGenerator,
             NullLogger<LoginUserCommandHandler>.Instance);
     }
 
@@ -57,6 +60,12 @@ public class LoginUserCommandHandlerTests
         result.AccessToken.Should().Be($"token-for::{user.Id}");
         result.ExpiresAtUtc.Should().BeAfter(DateTime.UtcNow);
         result.RefreshToken.Should().NotBeNullOrWhiteSpace();
+
+        // The refresh token was persisted (as a hash) so it can later be rotated and revoked.
+        var storedToken = await _context.RefreshTokens.SingleAsync();
+        storedToken.UserId.Should().Be(user.Id);
+        storedToken.TokenHash.Should().Be(_refreshTokenGenerator.ComputeHash(result.RefreshToken));
+        storedToken.IsActive.Should().BeTrue();
 
         // The token was minted for the account that was resolved from the database.
         _tokenGenerator.RequestedFor.Should().Be(user.Id);
@@ -177,6 +186,7 @@ public class LoginUserCommandHandlerTests
         public DbSet<User> Users => Set<User>();
         public DbSet<Resource> Resources => Set<Resource>();
         public DbSet<Booking> Bookings => Set<Booking>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     }
 
     /// <summary>
@@ -213,5 +223,23 @@ public class LoginUserCommandHandlerTests
 
             return new AccessToken($"token-for::{user.Id}", DateTime.UtcNow.AddMinutes(15));
         }
+    }
+
+    /// <summary>
+    /// Deterministic refresh-token generator: each call yields a unique token with a stable,
+    /// reproducible hash so the tests can assert on persistence and rotation without the real CSPRNG.
+    /// </summary>
+    private class FakeRefreshTokenGenerator : IRefreshTokenGenerator
+    {
+        private int _counter;
+
+        public RefreshTokenMaterial Generate()
+        {
+            var token = $"refresh-token::{++_counter}";
+
+            return new RefreshTokenMaterial(token, ComputeHash(token), DateTime.UtcNow.AddDays(7));
+        }
+
+        public string ComputeHash(string token) => $"hash::{token}";
     }
 }

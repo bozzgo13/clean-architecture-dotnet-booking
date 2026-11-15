@@ -1,7 +1,7 @@
-using System.Security.Cryptography;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MyBookingApi.Application.Auth.Common;
 using MyBookingApi.Application.Common.Interfaces;
 using MyBookingApi.Domain.Entities;
 
@@ -16,39 +16,19 @@ namespace MyBookingApi.Application.Auth.Commands.Login;
 public record LoginUserCommand(
     string Email,
     string Password
-) : IRequest<LoginUserResponse>;
-
-/// <summary>
-/// The credentials handed back to a client after a successful authentication.
-/// It deliberately carries no personal data and no password material (data minimization).
-/// </summary>
-/// <param name="AccessToken">The signed JWT access token used to authenticate subsequent requests.</param>
-/// <param name="ExpiresAtUtc">The instant (UTC) at which the access token expires.</param>
-/// <param name="RefreshToken">
-/// An opaque, cryptographically secure value the client can present to obtain a new access token
-/// without re-sending the password.
-/// </param>
-public sealed record LoginUserResponse(
-    string AccessToken,
-    DateTime ExpiresAtUtc,
-    string RefreshToken);
+) : IRequest<AuthTokenResponse>;
 
 /// <summary>
 /// Handles the execution of the <see cref="LoginUserCommand"/>. It resolves the account by its
 /// normalized email, verifies the supplied password against the stored hash in constant time with
-/// respect to account existence, and - on success - issues the access and refresh tokens.
+/// respect to account existence, and - on success - issues and persists the access and refresh tokens.
 /// </summary>
-public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, LoginUserResponse>
+public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, AuthTokenResponse>
 {
-    /// <summary>
-    /// Number of cryptographically random bytes backing a refresh token. 64 bytes (512 bits) makes
-    /// guessing a valid token computationally infeasible.
-    /// </summary>
-    private const int RefreshTokenSizeInBytes = 64;
-
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IRefreshTokenGenerator _refreshTokenGenerator;
     private readonly ILogger<LoginUserCommandHandler> _logger;
 
     /// <summary>
@@ -57,16 +37,19 @@ public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, LoginUs
     /// <param name="context">The database context abstraction accessed via Dependency Injection.</param>
     /// <param name="passwordHasher">The password hashing service used to verify the credential.</param>
     /// <param name="jwtTokenGenerator">The service that issues the signed JWT access token.</param>
+    /// <param name="refreshTokenGenerator">The service that generates and hashes the refresh token.</param>
     /// <param name="logger">The structured logger used for security-relevant audit events.</param>
     public LoginUserCommandHandler(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
         IJwtTokenGenerator jwtTokenGenerator,
+        IRefreshTokenGenerator refreshTokenGenerator,
         ILogger<LoginUserCommandHandler> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _refreshTokenGenerator = refreshTokenGenerator;
         _logger = logger;
     }
 
@@ -81,7 +64,7 @@ public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, LoginUs
     /// raised in both cases so the response cannot be used to enumerate valid accounts; the global
     /// exception handler maps it to a generic 401 Unauthorized.
     /// </exception>
-    public async Task<LoginUserResponse> Handle(LoginUserCommand request, CancellationToken cancellationToken)
+    public async Task<AuthTokenResponse> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
         // Look the account up by its normalized email so the comparison is case-insensitive and
         // matches the value persisted during registration. The entity is only read, never mutated,
@@ -110,22 +93,19 @@ public class LoginUserCommandHandler : IRequestHandler<LoginUserCommand, LoginUs
         }
 
         var accessToken = _jwtTokenGenerator.GenerateAccessToken(user);
-        var refreshToken = GenerateRefreshToken();
+
+        // Persist the refresh token (as a hash) so it can be looked up, rotated and revoked later.
+        var now = DateTime.UtcNow;
+        var refreshToken = _refreshTokenGenerator.Generate();
+        _context.RefreshTokens.Add(
+            new RefreshToken(user.Id, refreshToken.TokenHash, now, refreshToken.ExpiresAtUtc));
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Audit-relevant security event (recorded at Information): a successful authentication. Only
         // the opaque user identifier is recorded; no credential or token value is logged.
         _logger.LogInformation("Login succeeded. UserId={UserId}", user.Id);
 
-        return new LoginUserResponse(accessToken.Token, accessToken.ExpiresAtUtc, refreshToken);
-    }
-
-    /// <summary>
-    /// Creates an opaque refresh token from the operating system's cryptographically secure random
-    /// number generator, hex-encoded so it is safe to transport in a JSON payload and in a URL.
-    /// </summary>
-    /// <returns>A fresh, unpredictable refresh token value.</returns>
-    private static string GenerateRefreshToken()
-    {
-        return Convert.ToHexString(RandomNumberGenerator.GetBytes(RefreshTokenSizeInBytes));
+        return new AuthTokenResponse(accessToken.Token, accessToken.ExpiresAtUtc, refreshToken.Token);
     }
 }
