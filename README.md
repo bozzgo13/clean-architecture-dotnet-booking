@@ -72,10 +72,12 @@ The system strictly adheres to the **OWASP API Security Top 10 (2023)** standard
 
 ## 3. Challenges Encountered & Solutions
 
-### A. Package Versioning Constraints (.NET 10 Compatibility)
-* **Problem:** When attempting to install `Microsoft.EntityFrameworkCore.SqlServer`, NuGet threw a version mismatch error:
-  > `Package Microsoft.EntityFrameworkCore.SqlServer 11.0.0 is not compatible with net10.0 (.NETCoreApp,Version=v10.0). Package Microsoft.EntityFrameworkCore.SqlServer 11.0.0 supports: net11.0 (.NETCoreApp,Version=v11.0)`
-* **Solution:** Because the project targets **.NET 10**, dependencies across EF Core and third-party packages must be explicitly pinned to `.NET 10`-compatible versions (e.g., `10.x.x`) instead of automatically pulling latest major releases.
+### A. Package Versioning Constraints & Security Vulnerability Mitigation (.NET 10 Compatibility)
+* **Problem 1 (Version Incompatibility):** When attempting to install packages like `Microsoft.EntityFrameworkCore.SqlServer`, NuGet threw a version mismatch error because the latest package versions targeted newer runtimes (e.g., .NET 11) rather than the project's target framework (`net10.0`).
+* **Problem 2 (Known Vulnerabilities):** Transitive or direct dependencies (such as `System.Security.Cryptography.Pkcs` or `System.Security.Cryptography.Xml`) occasionally trigger security warnings (e.g., moderate/high severity vulnerabilities) in older minor/patch releases.
+* **Solution:** 
+  * Explicitly pin dependencies to **.NET 10-compatible versions** (e.g., matching the `10.x.x` major version line) to prevent automatic roll-forward or installation of incompatible framework versions.
+  * Proactively update NuGet packages to their latest stable patch versions within the same major version to eliminate known security advisories and dependency warnings, ensuring a clean, secure build pipeline.
 
 ### B. Securing Connection Strings (Avoiding Hardcoded Secrets)
 * **Problem:** Committing actual database connection strings with credentials into public or shared Git repositories presents security risks.
@@ -84,6 +86,27 @@ The system strictly adheres to the **OWASP API Security Top 10 (2023)** standard
 ### C. Replacing Swagger with Scalar for API Documentation
 * **Problem:** Swagger UI / Swashbuckle is no longer included or maintained by default in newer .NET Web API templates.
 * **Solution:** Integrated **Scalar** (`Scalar.AspNetCore`) for modern, interactive API documentation. Configured `launchSettings.json` so that launching the Web API in the `Development` environment automatically opens the Scalar API documentation page in the browser (`/scalar/v1`).
+
+### D. Refresh Token Concurrency Control (Preventing Double-Spend / Race Conditions)
+* **Problem:** When handling concurrent HTTP requests using the same active refresh token (e.g., due to client retries or race conditions), standard database reads and updates can allow multiple requests to pass validation simultaneously and issue successor tokens, defeating the single-use guarantee of token rotation.
+* **Solution:** Implemented **optimistic concurrency control** on refresh token redemption. By enforcing a concurrency check (e.g., tracking row versions or state changes in a single atomic transaction), the database guarantees that only the first redemption wins, while subsequent concurrent attempts to use the same token are safely rejected.
+
+### E. Strict Breach Detection vs. Network Resiliency in Token Rotation
+* **Problem:** Replaying an already-revoked refresh token indicates a potential token theft attempt (token reuse attack). However, aggressive invalidation policies can penalize legitimate clients experiencing network retries.
+* **Solution:** Adopted a **strict breach response** policy. Any replay of an already-revoked refresh token immediately triggers a security lockdown, mass-revoking all active sessions for that user. This prioritizes zero-tolerance security over grace-window leniency, aligning with strict OAuth 2.0 Security BCP recommendations.
+
+### F. Complete Session Lifecycle Management (Logout & Background Cleanup)
+* **Problem:** Allowing refresh tokens to accumulate indefinitely without an explicit revocation path or row pruning leads to database bloat and lingering active sessions after a user leaves.
+* **Solution:** 
+  * Added a dedicated, rate-limited `POST /api/v1/auth/logout` endpoint for explicit, secure user session termination.
+  * Implemented a scheduled background service (`IHostedService`) to periodically purge expired and revoked refresh tokens, maintaining database hygiene and bounded table growth.
+
+### G. Bootstrapping the First Administrator Securely (The Chicken-and-Egg Problem)
+* **Problem:** In a freshly deployed environment with an empty database, no administrator account exists. Relying on public registration endpoints creates severe security vulnerabilities (privilege escalation), while hardcoding credentials in configuration files or database migrations introduces high security risks and non-deterministic password hashing issues.
+* **Solution:** Implemented a secure, opt-in **Application-layer bootstrap command** paired with a **startup initializer (`IHostedService`)**:
+* **Isolated Command:** Created a dedicated `BootstrapAdminUserCommand` separate from public user registration to strictly prevent unauthorized role self-assignment.
+* **Cryptographically Secure Credentials:** When enabled (`AdminBootstrap__Enabled=true`), a high-entropy one-time password is generated dynamically in memory via a CSPRNG and printed to standard output on first run, ensuring secrets never reside in source control or configuration files.
+* **Idempotency & Concurrency Safety:** The handler safely checks for existing administrators and gracefully handles multi-replica database races using unique email constraints, making it completely safe to execute on every startup.
 
 ---
 
