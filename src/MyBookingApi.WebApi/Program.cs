@@ -40,6 +40,21 @@ builder.Services.AddOptions<RefreshTokenCleanupOptions>()
 
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
+// First-run administrator provisioning (OWASP API8:2023 - Security Misconfiguration). The path is
+// entirely opt-in: it stays inert unless AdminBootstrap:Enabled is true, so a fresh deployment can
+// create its first administrator without shipping any credential in configuration or source control.
+// The one-time password is generated in memory by the hosted service; only the non-secret email is
+// configured, and only for the very first deployment. The conditional validation guarantees a missing
+// email is caught at startup (fail-fast) rather than silently skipping provisioning.
+builder.Services.AddOptions<AdminBootstrapOptions>()
+    .Bind(builder.Configuration.GetSection(AdminBootstrapOptions.SectionName))
+    .Validate(
+        options => !options.Enabled || !string.IsNullOrWhiteSpace(options.Email),
+        "AdminBootstrap:Email is required when AdminBootstrap:Enabled is true.")
+    .ValidateOnStart();
+
+builder.Services.AddHostedService<AdminBootstrapHostedService>();
+
 // Fail-fast configuration validation (OWAST API8:2023 – Security Misconfiguration). Bind the "Jwt" section to a strongly-typed options
 // object and validate it when the host starts: a missing issuer/audience or a signing key shorter
 // than 256 bits (the HS256 minimum) aborts startup instead of allowing forgeable tokens.
