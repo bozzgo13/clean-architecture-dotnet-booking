@@ -133,9 +133,9 @@ Apply the migration to create the SQL Server database and tables:
 dotnet ef database update --project src/MyBookingApi.Infrastructure --startup-project src/MyBookingApi.WebApi
 ```
 
-### Step 4: Configure Local Application Secrets (JWT Configuration)
+### Step 4: Configure Local Application Secrets (JWT & Admin Bootstrap)
 
-Because the API enforces strict startup validation and requires a secure cryptographic key (at least 256 bits / 32 bytes) for JWT token generation, you must configure your local secrets before running the application. Choose **one** of the following methods:
+Because the API enforces strict startup validation for JWT tokens and provides a secure, opt-in mechanism to bootstrap the first administrator account, you must configure your local secrets before running the application. Choose **one** of the following methods:
 
 #### Option A: Using .NET User Secrets (Recommended for local development)
 
@@ -147,6 +147,8 @@ dotnet user-secrets init
 dotnet user-secrets set "Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
 dotnet user-secrets set "Jwt:Issuer" "MyBookingApi"
 dotnet user-secrets set "Jwt:Audience" "MyBookingApiUsers"
+dotnet user-secrets set "AdminBootstrap:Enabled" "true"
+dotnet user-secrets set "AdminBootstrap:Email" "admin@mybooking.local"
 
 ```
 
@@ -160,6 +162,8 @@ Alternatively, you can provide the configuration via environment variables in yo
 $env:Jwt__Key = "Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
 $env:Jwt__Issuer = "MyBookingApi"
 $env:Jwt__Audience = "MyBookingApiUsers"
+$env:AdminBootstrap__Enabled = "true"
+$env:AdminBootstrap__Email = "admin@mybooking.local"
 
 ```
 
@@ -169,14 +173,20 @@ $env:Jwt__Audience = "MyBookingApiUsers"
 export Jwt__Key="Repl@ceThis$tringWithA$trong$ecretKeyOfAtLe@st32Ch@r@ctersLength"
 export Jwt__Issuer="MyBookingApi"
 export Jwt__Audience="MyBookingApiUsers"
+export AdminBootstrap__Enabled="true"
+export AdminBootstrap__Email="admin@mybooking.local"
 
 ```
 
 ---
 
 ### Step 5: Run the Application
+
 Run the Web API project:
+
 ```bash
 dotnet run --project src/MyBookingApi.WebApi
+
 ```
-When running in `Development` mode, the Scalar API documentation interface will automatically launch in your browser.
+
+When running in `Development` mode, the Scalar API documentation interface will automatically launch in your browser (`/scalar/v1`). If `AdminBootstrap:Enabled` is set to `true`, the application will securely generate a one-time password on startup and print your initial admin credentials directly to the console.
