@@ -37,4 +37,11 @@ public sealed class JwtOptions
     /// </summary>
     [Range(1, 1440, ErrorMessage = "Jwt:AccessTokenLifetimeMinutes must be between 1 and 1440 minutes.")]
     public int AccessTokenLifetimeMinutes { get; set; } = 15;
+
+    /// <summary>
+    /// The lifetime, in days, of an issued refresh token. It bounds how long a client can keep a
+    /// session alive without re-authenticating. Defaults to 7 days.
+    /// </summary>
+    [Range(1, 365, ErrorMessage = "Jwt:RefreshTokenLifetimeDays must be between 1 and 365 days.")]
+    public int RefreshTokenLifetimeDays { get; set; } = 7;
 }

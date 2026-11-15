@@ -27,6 +27,10 @@ public static class DependencyInjection
         // immutable validated options, so a single instance can safely be shared.
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
+        // Register the refresh-token generator (CSPRNG generation + SHA-256 hashing). It is stateless
+        // apart from the validated options, so a single instance can safely be shared.
+        services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
+
         return services;
     }
 }
