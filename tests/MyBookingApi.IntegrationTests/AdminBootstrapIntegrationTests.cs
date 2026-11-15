@@ -1,5 +1,7 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyBookingApi.Domain.Enums;
 using MyBookingApi.Infrastructure.Persistence;
@@ -43,8 +45,16 @@ public class AdminBootstrapIntegrationTests
         using var factory = new MyBookingApiWebApplicationFactory()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("AdminBootstrap:Enabled", "true");
-                builder.UseSetting("AdminBootstrap:Email", "Bootstrapped.Admin@email.com");
+                // Override at the same configuration layer as the factory's hermetic defaults so this
+                // value (appended last) takes precedence for this host only.
+                builder.ConfigureAppConfiguration((_, configuration) =>
+                {
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["AdminBootstrap:Enabled"] = "true",
+                        ["AdminBootstrap:Email"] = "Bootstrapped.Admin@email.com",
+                    });
+                });
             });
 
         // Act

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MyBookingApi.Infrastructure.Persistence;
 
@@ -14,6 +15,13 @@ using MyBookingApi.Infrastructure.Persistence;
 /// </summary>
 public class MyBookingApiWebApplicationFactory : WebApplicationFactory<Program>
 {
+    /// <summary>
+    /// Deterministic signing key used by the test host. The production application deliberately
+    /// refuses to start without a strong JWT key (see the fail-fast validation in Program.cs); this
+    /// value only satisfies that startup check.
+    /// </summary>
+    public const string TestSigningKey = "integration-tests-only-signing-key-0123456789-abcdef";
+
     // A unique database name per factory instance keeps each test fully isolated.
     private readonly string _databaseName = Guid.NewGuid().ToString();
 
@@ -21,10 +29,21 @@ public class MyBookingApiWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
 
-        // The production application deliberately refuses to start without a strong JWT signing key
-        // (see the fail-fast validation in Program.cs). The integration host replaces the JWT bearer
-        // scheme with TestAuthHandler, so this value is only here to satisfy that startup check.
-        builder.UseSetting("Jwt:Key", "integration-tests-only-signing-key-0123456789-abcdef");
+        // Hermetic configuration: in the Development environment ASP.NET Core automatically loads
+        // machine-local User Secrets, which means a developer's personal overrides (for example a
+        // different Jwt:Audience or an enabled AdminBootstrap) would silently leak into the suite.
+        // Pin the values the tests assert on so the results are identical on every machine and CI agent.
+        builder.ConfigureAppConfiguration((_, configuration) =>
+        {
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Issuer"] = "MyBookingApi",
+                ["Jwt:Audience"] = "MyBookingApiClient",
+                ["Jwt:Key"] = TestSigningKey,
+                // The first-run bootstrap is opt-in by design; tests that exercise it enable it explicitly.
+                ["AdminBootstrap:Enabled"] = "false",
+            });
+        });
 
         builder.ConfigureTestServices(services =>
         {
