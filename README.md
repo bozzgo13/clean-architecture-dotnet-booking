@@ -138,7 +138,6 @@ dotnet ef database update --project src/MyBookingApi.Infrastructure --startup-pr
 Because the API enforces strict startup validation for JWT tokens and provides a secure, opt-in mechanism to bootstrap the first administrator account, you must configure your local secrets before running the application. Choose **one** of the following methods:
 
 #### Option A: Using .NET User Secrets (Recommended for local development)
-
 Navigate to the Web API project directory and set the required configuration values securely using User Secrets (keeping secrets out of source control):
 
 ```bash
@@ -189,4 +188,15 @@ dotnet run --project src/MyBookingApi.WebApi
 
 ```
 
-When running in `Development` mode, the Scalar API documentation interface will automatically launch in your browser (`/scalar/v1`). If `AdminBootstrap:Enabled` is set to `true`, the application will securely generate a one-time password on startup and print your initial admin credentials directly to the console.
+When running in `Development` mode, the Scalar API documentation interface will automatically launch in your browser (`/scalar/v1`).
+
+If `AdminBootstrap:Enabled` is set to `true` and the database is fresh, the application will securely generate a one-time password on startup and print your initial admin credentials directly to the console:
+
+```text
+[AdminBootstrap] Account: admin@mybooking.local
+[AdminBootstrap] One-time password: 4#k9$mP2!qX8vL0#rW3*yZ7pQ5nJ1sT6
+[AdminBootstrap] Change this password on first sign-in, then unset AdminBootstrap__Enabled.
+
+```
+
+*(Note: Once the administrator is successfully provisioned, the handler becomes inert and safe even if the configuration remains enabled, though it is recommended to unset `AdminBootstrap__Enabled` afterwards).*
