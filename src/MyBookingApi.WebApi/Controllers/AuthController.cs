@@ -11,8 +11,17 @@ using MyBookingApi.WebApi.Contracts;
 
 namespace MyBookingApi.WebApi.Controllers;
 
+/// <summary>
+/// Exposes the authentication endpoints under the versioned <c>/api/v1/auth</c> route.
+///
+/// The controller is deny-by-default: the class-level <see cref="AuthorizeAttribute"/> requires an
+/// authenticated caller for any action that does not opt out. The four endpoints that legitimately
+/// serve unauthenticated callers opt out explicitly with <see cref="AllowAnonymousAttribute"/>, so a
+/// newly added action cannot become public by accident (OWASP API5:2023 - BFLA).
+/// </summary>
 [ApiController]
 [Route("api/v1/auth")]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private readonly ISender _mediator;

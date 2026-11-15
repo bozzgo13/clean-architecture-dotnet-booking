@@ -9,6 +9,11 @@ using MyBookingApi.WebApi.Extensions;
 
 namespace MyBookingApi.WebApi.Controllers;
 
+/// <summary>
+/// Exposes the booking endpoints under the <c>/api/bookings</c> route.
+///
+/// The controller is deny-by-default.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
